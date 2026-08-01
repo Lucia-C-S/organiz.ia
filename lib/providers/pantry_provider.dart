@@ -106,7 +106,7 @@ class PantryProvider extends ChangeNotifier {
       _stores = ['Supermarket', 'Farmacia', 'Corner shop'];
     }
     if (_locations.isEmpty) {
-      _locations = ['Pantry shelf', 'Fridge', 'Freezer'];
+      _locations = ['Pantry', 'Fridge', 'Freezer'];
     }
 
     // load per-location metadata (grid sizes)
@@ -115,6 +115,9 @@ class PantryProvider extends ChangeNotifier {
     } catch (_) {
       _locationMeta = {};
     }
+    _locationMeta.putIfAbsent('Pantry', () => {'rows': 5, 'columns': 5});
+    _locationMeta.putIfAbsent('Fridge', () => {'rows': 8, 'columns': 1});
+    _locationMeta.putIfAbsent('Freezer', () => {'rows': 3, 'columns': 1});
     for (final loc in _locations) {
       _locationMeta.putIfAbsent(loc, () => {'rows': gridRowCount, 'columns': gridColumnCount});
     }

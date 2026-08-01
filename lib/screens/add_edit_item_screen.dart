@@ -29,10 +29,13 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
   final _brandController = TextEditingController();
   final _barcodeController = TextEditingController();
   final _storeController = TextEditingController();
-  final _locationController = TextEditingController();
   DateTime? _expiryDate;
   int? _gridRow;
   int? _gridColumn;
+  String _locationType = 'Pantry';
+  String _pantryZone = 'Cupboard 1';
+  int _pantryShelf = 1;
+  int _pantryColumn = 1;
 
   @override
   void initState() {
@@ -43,73 +46,84 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       _brandController.text = initial.brand;
       _barcodeController.text = initial.barcode;
       _storeController.text = initial.store;
-      _locationController.text = initial.location;
       _expiryDate = initial.expiryDate;
       _gridRow = initial.gridRow;
       _gridColumn = initial.gridColumn;
+      _locationType = _normalizeLocationType(initial.locationType.isNotEmpty ? initial.locationType : initial.location);
+      _pantryZone = _parsePantryZone(initial.locationDetail) ?? 'Cupboard 1';
+      _pantryShelf = _parsePantryShelf(initial.locationDetail) ?? (_gridRow != null && _gridRow! >= 1 && _gridRow! <= 5 ? _gridRow! : 1);
+      _pantryColumn = _parsePantryColumn(initial.locationDetail) ?? (_gridColumn != null && _gridColumn! >= 1 && _gridColumn! <= 5 ? _gridColumn! : 1);
     } else {
-      _locationController.text = widget.initialLocation ?? '';
+      _locationType = _normalizeLocationType(widget.initialLocation ?? 'Pantry');
       _gridRow = widget.initialGridRow;
       _gridColumn = widget.initialGridColumn;
+      if (_isPantry) {
+        _pantryShelf = _gridRow != null && _gridRow! >= 1 && _gridRow! <= 5 ? _gridRow! : 1;
+        _pantryColumn = _gridColumn != null && _gridColumn! >= 1 && _gridColumn! <= 5 ? _gridColumn! : 1;
+      }
     }
-    _updateGridSelection();
+    _syncGridSelection();
   }
 
-  bool get _isFreezer => _locationController.text.toLowerCase().contains('freezer');
-  bool get _isFridge => _locationController.text.toLowerCase().contains('fridge');
+  bool get _isPantry => _locationType == 'Pantry';
+  bool get _isFreezer => _locationType == 'Freezer';
+  bool get _isFridge => _locationType == 'Fridge';
 
-  void _updateGridSelection() {
+  void _syncGridSelection() {
     if (_isFreezer) {
       _gridRow = (_gridRow != null && _gridRow! >= 1 && _gridRow! <= 3) ? _gridRow : 1;
       _gridColumn = 1;
     } else if (_isFridge) {
       _gridRow = (_gridRow != null && _gridRow! >= 1 && _gridRow! <= 8) ? _gridRow : 1;
       _gridColumn = 1;
+    } else {
+      _pantryShelf = (_pantryShelf >= 1 && _pantryShelf <= 5) ? _pantryShelf : 1;
+      _pantryColumn = (_pantryColumn >= 1 && _pantryColumn <= 5) ? _pantryColumn : 1;
+      _gridRow = _pantryShelf;
+      _gridColumn = _pantryColumn;
     }
   }
 
-  String _sectionLabel(int index) {
-    if (_isFreezer) {
-      return 'Drawer $index';
+  String _normalizeLocationType(String value) {
+    final normalized = value.trim().toLowerCase();
+    if (normalized.contains('freezer')) {
+      return 'Freezer';
     }
-    if (_isFridge) {
-      const fridgeLabels = {
-        1: 'Shelf 1',
-        2: 'Shelf 2',
-        3: 'Shelf 3',
-        4: 'Shelf 4',
-        5: 'Shelf 5',
-        6: 'Door',
-        7: 'Drawer 1',
-        8: 'Drawer 2',
-      };
-      return fridgeLabels[index] ?? 'Section $index';
+    if (normalized.contains('fridge')) {
+      return 'Fridge';
     }
-    return 'Row $index';
+    return 'Pantry';
   }
 
-  List<int> _rowOptions(PantryProvider provider) {
-    if (_isFreezer) {
-      return [1, 2, 3];
+  String? _parsePantryZone(String detail) {
+    final normalized = detail.toLowerCase();
+    if (normalized.contains('wine cellar')) {
+      return 'Wine cellar';
     }
-    if (_isFridge) {
-      return List<int>.generate(8, (index) => index + 1);
+    if (normalized.contains('cupboard 2')) {
+      return 'Cupboard 2';
     }
-    final location = _locationController.text.trim();
-    final rowCount = location.isNotEmpty ? provider.getGridRows(location) : PantryProvider.gridRowCount;
-    return List<int>.generate(rowCount, (index) => index + 1);
+    if (normalized.contains('cupboard 1')) {
+      return 'Cupboard 1';
+    }
+    return null;
   }
 
-  bool get _usesGridColumn => !_isFreezer && !_isFridge;
+  int? _parsePantryShelf(String detail) {
+    final match = RegExp(r'shelf\s*(\d+)', caseSensitive: false).firstMatch(detail);
+    return match == null ? null : int.tryParse(match.group(1)!);
+  }
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _brandController.dispose();
-    _barcodeController.dispose();
-    _storeController.dispose();
-    _locationController.dispose();
-    super.dispose();
+  int? _parsePantryColumn(String detail) {
+    final match = RegExp(r'column\s*(\d+)', caseSensitive: false).firstMatch(detail);
+    return match == null ? null : int.tryParse(match.group(1)!);
+  }
+
+  String _buildPantryLocationDetail() {
+    if (_pantryZone == 'Wine cellar') {
+      return 'Wine cellar';
+    }
+    return '$_pantryZone • Shelf $_pantryShelf • Column $_pantryColumn';
   }
 
   Future<void> _pickExpiryDate() async {
@@ -140,10 +154,12 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       photoUrl: '',
       expiryDate: _expiryDate!,
       store: _storeController.text.trim(),
-      location: _locationController.text.trim(),
+      location: _locationType,
+      locationType: _locationType,
+      locationDetail: _isPantry ? _buildPantryLocationDetail() : '',
       gridRow: _gridRow,
       gridColumn: _gridColumn,
-      barcode: _barcodeController.text.trim(),
+      barcode: _isFreezer ? '' : _barcodeController.text.trim(),
       addedBy: provider.currentUser,
       addedAt: widget.initialItem?.addedAt ?? DateTime.now(),
     );
@@ -157,60 +173,21 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     Navigator.pop(context);
   }
 
-  Widget _buildAutocompleteField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    required List<String> options,
-    String? Function(String?)? validator,
-  }) {
-    return Autocomplete<String>(
-      initialValue: TextEditingValue(text: controller.text),
-      optionsBuilder: (TextEditingValue textEditingValue) {
-        if (textEditingValue.text.isEmpty) {
-          return options;
-        }
-        return options.where((option) => option
-            .toLowerCase()
-            .contains(textEditingValue.text.toLowerCase()));
-      },
-      onSelected: (selection) {
-        controller.text = selection;
-        if (label == 'Location') {
-          setState(() {
-            _updateGridSelection();
-          });
-        }
-      },
-      fieldViewBuilder: (context, textController, focusNode, onFieldSubmitted) {
-        return TextFormField(
-          controller: textController,
-          focusNode: focusNode,
-          decoration: InputDecoration(
-            labelText: label,
-            prefixIcon: Icon(icon),
-          ),
-          validator: validator,
-          textInputAction: TextInputAction.next,
-          onChanged: (value) {
-            if (label == 'Location') {
-              setState(() {
-                _locationController.text = value;
-                _updateGridSelection();
-              });
-            }
-          },
-          onFieldSubmitted: (_) => onFieldSubmitted(),
-        );
-      },
-    );
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _brandController.dispose();
+    _barcodeController.dispose();
+    _storeController.dispose();
+    super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<PantryProvider>();
     final isEditing = widget.initialItem != null;
     final expiryLabel = _expiryDate == null
-        ? 'Pick expiry date'
+        ? (_isFreezer ? 'Pick freezing date' : 'Pick expiry date')
         : DateFormat.yMMMMd().format(_expiryDate!);
 
     return Scaffold(
@@ -225,16 +202,79 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
             key: _formKey,
             child: Column(
               children: [
-                TextFormField(
-                  controller: _barcodeController,
+                DropdownButtonFormField<String>(
+                  value: _locationType,
                   decoration: const InputDecoration(
-                    labelText: 'Barcode',
-                    prefixIcon: Icon(Icons.qr_code),
+                    labelText: 'Storage area',
+                    prefixIcon: Icon(Icons.kitchen),
                   ),
-                  keyboardType: TextInputType.number,
-                  textInputAction: TextInputAction.next,
+                  items: const [
+                    DropdownMenuItem(value: 'Pantry', child: Text('Pantry')),
+                    DropdownMenuItem(value: 'Fridge', child: Text('Fridge')),
+                    DropdownMenuItem(value: 'Freezer', child: Text('Freezer')),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) {
+                      return;
+                    }
+                    setState(() {
+                      _locationType = value;
+                      _syncGridSelection();
+                    });
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Select a storage area.';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 14),
+                if (_isPantry) ...[
+                  DropdownButtonFormField<String>(
+                    value: _pantryZone,
+                    decoration: const InputDecoration(
+                      labelText: 'Pantry location',
+                      prefixIcon: Icon(Icons.bento),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'Cupboard 1', child: Text('Cupboard 1')),
+                      DropdownMenuItem(value: 'Cupboard 2', child: Text('Cupboard 2')),
+                      DropdownMenuItem(value: 'Wine cellar', child: Text('Wine cellar')),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) {
+                        return;
+                      }
+                      setState(() {
+                        _pantryZone = value;
+                        if (_pantryZone == 'Wine cellar') {
+                          _pantryShelf = 1;
+                          _pantryColumn = 1;
+                        }
+                        _syncGridSelection();
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                ],
+                if (!_isFreezer)
+                  TextFormField(
+                    controller: _barcodeController,
+                    decoration: const InputDecoration(
+                      labelText: 'Barcode',
+                      prefixIcon: Icon(Icons.qr_code),
+                    ),
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.next,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Enter a barcode.';
+                      }
+                      return null;
+                    },
+                  ),
+                if (!_isFreezer) const SizedBox(height: 14),
                 TextFormField(
                   controller: _nameController,
                   decoration: const InputDecoration(
@@ -259,82 +299,84 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                   textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 14),
-                _buildAutocompleteField(
+                TextFormField(
                   controller: _storeController,
-                  label: 'Store',
-                  icon: Icons.location_city,
-                  options: provider.stores,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Enter the store name.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 14),
-                _buildAutocompleteField(
-                  controller: _locationController,
-                  label: 'Location',
-                  icon: Icons.kitchen,
-                  options: provider.locations,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Enter where you store this item.';
-                    }
-                    return null;
-                  },
+                  decoration: InputDecoration(
+                    labelText: _isFreezer ? 'Store (optional)' : 'Store',
+                    prefixIcon: const Icon(Icons.location_city),
+                  ),
+                  validator: _isFreezer
+                      ? null
+                      : (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Enter the store name.';
+                          }
+                          return null;
+                        },
+                  textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 14),
                 Row(
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<int>(
-                        initialValue: _gridRow,
+                        value: _gridRow,
                         decoration: InputDecoration(
                           labelText: _isFreezer
                               ? 'Drawer'
                               : _isFridge
                                   ? 'Section'
-                                  : 'Grid row',
+                                  : 'Shelf',
                           prefixIcon: const Icon(Icons.grid_view),
                         ),
-                        items: _rowOptions(provider).map((value) {
-                          return DropdownMenuItem<int>(
-                            value: value,
-                            child: Text(_sectionLabel(value)),
-                          );
-                        }).toList(),
-                        onChanged: (value) => setState(() {
-                          _gridRow = value;
-                          if (_usesGridColumn && _gridColumn == null) {
-                            _gridColumn = 1;
+                        items: _buildSelectionItems(provider),
+                        onChanged: (value) {
+                          if (value == null) {
+                            return;
                           }
-                        }),
+                          setState(() {
+                            _gridRow = value;
+                            if (_isPantry) {
+                              _pantryShelf = value;
+                            }
+                            if (!_isPantry) {
+                              _gridColumn = 1;
+                            }
+                          });
+                        },
                         validator: (value) {
                           if (value == null) {
-                            return 'Select a ${_isFreezer || _isFridge ? 'section' : 'row'}.';
+                            return 'Select a ${_isFreezer || _isFridge ? 'section' : 'shelf'}.';
                           }
                           return null;
                         },
                       ),
                     ),
-                    if (_usesGridColumn) ...[
+                    if (_isPantry) ...[
                       const SizedBox(width: 12),
                       Expanded(
                         child: DropdownButtonFormField<int>(
-                          initialValue: _gridColumn,
+                          value: _gridColumn,
                           decoration: const InputDecoration(
-                            labelText: 'Grid column',
+                            labelText: 'Column',
                             prefixIcon: Icon(Icons.view_column),
                           ),
-                          items: List.generate(PantryProvider.gridColumnCount, (index) {
+                          items: List.generate(5, (index) {
                             final value = index + 1;
                             return DropdownMenuItem<int>(
                               value: value,
                               child: Text('Col $value'),
                             );
                           }),
-                          onChanged: (value) => setState(() => _gridColumn = value),
+                          onChanged: (value) {
+                            if (value == null) {
+                              return;
+                            }
+                            setState(() {
+                              _gridColumn = value;
+                              _pantryColumn = value;
+                            });
+                          },
                           validator: (value) {
                             if (value == null) {
                               return 'Select a column.';
@@ -372,5 +414,33 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
         ),
       ),
     );
+  }
+
+  List<DropdownMenuItem<int>> _buildSelectionItems(PantryProvider provider) {
+    if (_isFreezer) {
+      return [1, 2, 3].map((value) => DropdownMenuItem(value: value, child: Text('Drawer $value'))).toList();
+    }
+    if (_isFridge) {
+      return List<int>.generate(8, (index) {
+        final value = index + 1;
+        const fridgeLabels = {
+          1: 'Shelf 1',
+          2: 'Shelf 2',
+          3: 'Shelf 3',
+          4: 'Shelf 4',
+          5: 'Shelf 5',
+          6: 'Door',
+          7: 'Drawer 1',
+          8: 'Drawer 2',
+        };
+        return DropdownMenuItem<int>(value: value, child: Text(fridgeLabels[value] ?? 'Section $value'));
+      });
+    }
+
+    final rowCount = provider.getGridRows('Pantry');
+    return List<int>.generate(rowCount, (index) {
+      final value = index + 1;
+      return DropdownMenuItem<int>(value: value, child: Text('Shelf $value'));
+    });
   }
 }
