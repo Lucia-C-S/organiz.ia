@@ -418,27 +418,27 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
 
   List<DropdownMenuItem<int>> _buildSelectionItems(PantryProvider provider) {
     if (_isFreezer) {
-      return [1, 2, 3].map((value) => DropdownMenuItem(value: value, child: Text('Drawer $value'))).toList();
+      return [1, 2, 3].map((value) => DropdownMenuItem<int>(value: value, child: Text('Drawer $value'))).toList();
     }
     if (_isFridge) {
-      return List<int>.generate(8, (index) {
+      const fridgeLabels = {
+        1: 'Shelf 1',
+        2: 'Shelf 2',
+        3: 'Shelf 3',
+        4: 'Shelf 4',
+        5: 'Shelf 5',
+        6: 'Door',
+        7: 'Drawer 1',
+        8: 'Drawer 2',
+      };
+      return List<DropdownMenuItem<int>>.generate(8, (index) {
         final value = index + 1;
-        const fridgeLabels = {
-          1: 'Shelf 1',
-          2: 'Shelf 2',
-          3: 'Shelf 3',
-          4: 'Shelf 4',
-          5: 'Shelf 5',
-          6: 'Door',
-          7: 'Drawer 1',
-          8: 'Drawer 2',
-        };
         return DropdownMenuItem<int>(value: value, child: Text(fridgeLabels[value] ?? 'Section $value'));
       });
     }
 
     final rowCount = provider.getGridRows('Pantry');
-    return List<int>.generate(rowCount, (index) {
+    return List<DropdownMenuItem<int>>.generate(rowCount, (index) {
       final value = index + 1;
       return DropdownMenuItem<int>(value: value, child: Text('Shelf $value'));
     });

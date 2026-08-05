@@ -39,7 +39,7 @@ class PantryApp extends StatelessWidget {
 
               colorScheme: ColorScheme.light(
                 primary: const Color.fromARGB(224, 116, 98, 78),
-                secondary: const Color.fromARGB(112, 51, 69, 109),
+                secondary: const Color.fromARGB(111, 48, 113, 64),
                 surface: const Color.fromARGB(112, 245, 242, 236),
                 ),
               scaffoldBackgroundColor: Color.fromARGB(203, 96, 79, 59),
