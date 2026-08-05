@@ -39,6 +39,7 @@ class PantryProvider extends ChangeNotifier {
   String _profileName = 'My Pantry';
   int _defaultExpiryDays = 14;
   int _preferredColorSeedIndex = 0;
+  List<String> _wineCategories = [];
 
   static const int gridRowCount = 3;
   static const int gridColumnCount = 4;
@@ -51,6 +52,7 @@ class PantryProvider extends ChangeNotifier {
   String get syncUserId => _firebaseService.currentUserId;
   List<String> get stores => List.unmodifiable(_stores);
   List<String> get locations => List.unmodifiable(_locations);
+  List<String> get wineCategories => List.unmodifiable(_wineCategories);
 
   int getGridRows(String location) => _locationMeta[location]?['rows'] ?? gridRowCount;
   int getGridColumns(String location) => _locationMeta[location]?['columns'] ?? gridColumnCount;
@@ -106,7 +108,8 @@ class PantryProvider extends ChangeNotifier {
       _stores = ['Supermarket', 'Farmacia', 'Corner shop'];
     }
     if (_locations.isEmpty) {
-      _locations = ['Pantry', 'Fridge', 'Freezer'];
+      // represent pantry as separate cupboards and a wine cellar
+      _locations = ['Cupboard 1', 'Cupboard 2', 'Wine cellar', 'Fridge', 'Freezer'];
     }
 
     // load per-location metadata (grid sizes)
@@ -115,9 +118,14 @@ class PantryProvider extends ChangeNotifier {
     } catch (_) {
       _locationMeta = {};
     }
-    _locationMeta.putIfAbsent('Pantry', () => {'rows': 5, 'columns': 5});
+    // default metadata for the new locations
+    _locationMeta.putIfAbsent('Cupboard 1', () => {'rows': gridRowCount, 'columns': gridColumnCount});
+    _locationMeta.putIfAbsent('Cupboard 2', () => {'rows': gridRowCount, 'columns': gridColumnCount});
+    // Wine cellar is a list view (no grid columns) - keep rows/columns small to avoid grid layout
+    _locationMeta.putIfAbsent('Wine cellar', () => {'rows': 0, 'columns': 0});
     _locationMeta.putIfAbsent('Fridge', () => {'rows': 8, 'columns': 1});
     _locationMeta.putIfAbsent('Freezer', () => {'rows': 3, 'columns': 1});
+
     for (final loc in _locations) {
       _locationMeta.putIfAbsent(loc, () => {'rows': gridRowCount, 'columns': gridColumnCount});
     }
@@ -131,12 +139,21 @@ class PantryProvider extends ChangeNotifier {
       _profileName = await _storageService.loadProfileName();
       _defaultExpiryDays = await _storageService.loadDefaultExpiryDays();
       _preferredColorSeedIndex = await _storageService.loadPreferredColorSeed();
+      _wineCategories = await _storageService.loadWineCategories();
     } catch (_) {
       _autoOpenAddAfterLookup = false;
       _autoAddWhenProductFound = false;
       _profileName = 'My Pantry';
       _defaultExpiryDays = 14;
       _preferredColorSeedIndex = 0;
+      _wineCategories = [
+        'Red wine',
+        'White wine',
+        'Portuguese wine',
+        'Champagne',
+        'Specials',
+        'Beer',
+      ];
     }
 
     try {
@@ -312,6 +329,21 @@ class PantryProvider extends ChangeNotifier {
     if (!_locations.contains(location)) return;
     _locationMeta[location] = {'rows': rows, 'columns': columns};
     await _storageService.saveLocationMeta(_locationMeta);
+    notifyListeners();
+  }
+
+  Future<void> addWineCategory(String category) async {
+    final trimmed = category.trim();
+    if (trimmed.isEmpty || _wineCategories.contains(trimmed)) return;
+    _wineCategories.add(trimmed);
+    await _storageService.saveWineCategories(_wineCategories);
+    notifyListeners();
+  }
+
+  Future<void> removeWineCategory(String category) async {
+    if (!_wineCategories.contains(category)) return;
+    _wineCategories.remove(category);
+    await _storageService.saveWineCategories(_wineCategories);
     notifyListeners();
   }
 

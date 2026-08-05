@@ -31,38 +31,51 @@ class HomeScreen extends StatelessWidget {
           ),
           body: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Column(
-              children: [
-                _HomeSummary(provider: provider),
-                const SizedBox(height: 12),
-                _GroupTypeSelector(groupType: groupType),
-                const SizedBox(height: 12),
-                if (groups.isEmpty)
-                  const Expanded(
-                    child: Center(
-                      child: Text(
-                        'No pantry items yet. Tap the + button to add one.',
-                        textAlign: TextAlign.center,
+            child: groups.isEmpty
+                ? Column(
+                    children: [
+                      _HomeSummary(provider: provider),
+                      const SizedBox(height: 12),
+                      _GroupTypeSelector(groupType: groupType),
+                      const SizedBox(height: 12),
+                      const Expanded(
+                        child: Center(
+                          child: Text(
+                            'No pantry items yet. Tap the + button to add one.',
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   )
-                else
-                  Expanded(
-                    child: ListView.separated(
-                      itemCount: groups.length,
-                      separatorBuilder: (context, index) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final sectionName = groups.keys.elementAt(index);
-                        final sectionItems = groups[sectionName]!;
-                        return _SectionCard(
-                          title: sectionName,
-                          items: sectionItems,
-                        );
-                      },
+                : SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        _HomeSummary(provider: provider),
+                        const SizedBox(height: 12),
+                        _GroupTypeSelector(groupType: groupType),
+                        const SizedBox(height: 12),
+                        ...List.generate(
+                          groups.length,
+                          (index) {
+                            final sectionName = groups.keys.elementAt(index);
+                            final sectionItems = groups[sectionName]!;
+                            return Column(
+                              children: [
+                                _SectionCard(
+                                  title: sectionName,
+                                  items: sectionItems,
+                                ),
+                                if (index < groups.length - 1)
+                                  const SizedBox(height: 12),
+                              ],
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                     ),
                   ),
-              ],
-            ),
           ),
           floatingActionButton: FloatingActionButton(
             onPressed: () => Navigator.push<PantryItem?>(

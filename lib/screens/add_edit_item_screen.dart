@@ -36,6 +36,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
   String _pantryZone = 'Cupboard 1';
   int _pantryShelf = 1;
   int _pantryColumn = 1;
+  String _wineCategory = '';
 
   @override
   void initState() {
@@ -49,8 +50,14 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       _expiryDate = initial.expiryDate;
       _gridRow = initial.gridRow;
       _gridColumn = initial.gridColumn;
-      _locationType = _normalizeLocationType(initial.locationType.isNotEmpty ? initial.locationType : initial.location);
-      _pantryZone = _parsePantryZone(initial.locationDetail) ?? 'Cupboard 1';
+      // If the saved location already specifies a cupboard, use it; otherwise normalize
+      if (initial.location == 'Cupboard 1' || initial.location == 'Cupboard 2' || initial.location == 'Wine cellar') {
+        _locationType = 'Pantry';
+        _pantryZone = initial.location;
+      } else {
+        _locationType = _normalizeLocationType(initial.locationType.isNotEmpty ? initial.locationType : initial.location);
+        _pantryZone = _parsePantryZone(initial.locationDetail) ?? 'Cupboard 1';
+      }
       _pantryShelf = _parsePantryShelf(initial.locationDetail) ?? (_gridRow != null && _gridRow! >= 1 && _gridRow! <= 5 ? _gridRow! : 1);
       _pantryColumn = _parsePantryColumn(initial.locationDetail) ?? (_gridColumn != null && _gridColumn! >= 1 && _gridColumn! <= 5 ? _gridColumn! : 1);
     } else {
@@ -147,6 +154,11 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     }
 
     final provider = context.read<PantryProvider>();
+
+    // Determine saved location name: for pantry, save cupboard name; for fridge/freezer use that name
+    final savedLocation = _isPantry ? _pantryZone : _locationType;
+    final savedLocationDetail = _pantryZone == 'Wine cellar' ? (_wineCategory.trim().isNotEmpty ? _wineCategory.trim() : 'Uncategorized') : _isPantry ? _buildPantryLocationDetail() : '';
+
     final item = PantryItem(
       id: widget.initialItem?.id ?? '',
       name: _nameController.text.trim(),
@@ -154,9 +166,9 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       photoUrl: '',
       expiryDate: _expiryDate!,
       store: _storeController.text.trim(),
-      location: _locationType,
+      location: savedLocation,
       locationType: _locationType,
-      locationDetail: _isPantry ? _buildPantryLocationDetail() : '',
+      locationDetail: savedLocationDetail,
       gridRow: _gridRow,
       gridColumn: _gridColumn,
       barcode: _isFreezer ? '' : _barcodeController.text.trim(),
@@ -262,17 +274,11 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                   TextFormField(
                     controller: _barcodeController,
                     decoration: const InputDecoration(
-                      labelText: 'Barcode',
+                      labelText: 'Barcode (optional)',
                       prefixIcon: Icon(Icons.qr_code),
                     ),
                     keyboardType: TextInputType.number,
                     textInputAction: TextInputAction.next,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Enter a barcode.';
-                      }
-                      return null;
-                    },
                   ),
                 if (!_isFreezer) const SizedBox(height: 14),
                 TextFormField(
@@ -388,7 +394,67 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                     ],
                   ],
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 14),
+                // If Wine cellar, show category dropdown
+                if (_isPantry && _pantryZone == 'Wine cellar') ...[
+                  Consumer<PantryProvider>(
+                    builder: (context, provider, child) {
+                      final categories = provider.wineCategories;
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: _wineCategory.trim().isNotEmpty ? _wineCategory : (categories.isNotEmpty ? categories.first : 'Uncategorized'),
+                              decoration: const InputDecoration(
+                                labelText: 'Wine category',
+                                prefixIcon: Icon(Icons.local_bar),
+                              ),
+                              items: [
+                                ...categories.map((c) => DropdownMenuItem<String>(value: c, child: Text(c))),
+                                if (_wineCategory.trim().isNotEmpty && !categories.contains(_wineCategory))
+                                  DropdownMenuItem<String>(value: _wineCategory, child: Text(_wineCategory)),
+                              ],
+                              onChanged: (v) => setState(() => _wineCategory = v ?? ''),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(Icons.add),
+                            tooltip: 'Add new category',
+                            onPressed: () async {
+                              final controller = TextEditingController();
+                              final result = await showDialog<String?>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('Add wine category'),
+                                  content: TextField(
+                                    controller: controller,
+                                    decoration: const InputDecoration(hintText: 'e.g., Rosé, Natural wine'),
+                                  ),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context, controller.text.trim()),
+                                      child: const Text('Add'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (result != null && result.isNotEmpty) {
+                                await provider.addWineCategory(result);
+                                if (mounted) {
+                                  setState(() => _wineCategory = result);
+                                }
+                              }
+                            },
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                ],
+                const SizedBox(height: 10),
                 Row(
                   children: [
                     Expanded(
@@ -438,7 +504,9 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     }
 
     final rowCount = provider.getGridRows('Pantry');
-    return List<DropdownMenuItem<int>>.generate(rowCount, (index) {
+    final rc = _isPantry ? provider.getGridRows(_pantryZone) : provider.getGridRows('Pantry');
+    final count = rc > 0 ? rc : 5;
+    return List<DropdownMenuItem<int>>.generate(count, (index) {
       final value = index + 1;
       return DropdownMenuItem<int>(value: value, child: Text('Shelf $value'));
     });

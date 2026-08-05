@@ -14,6 +14,7 @@ class LocalStorageService {
   static const _preferredColorSeedKey = 'preferred_color_seed';
   static const _autoOpenAddKey = 'auto_open_add_after_lookup';
   static const _autoAddKey = 'auto_add_when_product_found';
+  static const _wineCategoriesKey = 'wine_categories';
 
   Future<List<PantryItem>> loadPantryItems() async {
     final preferences = await SharedPreferences.getInstance();
@@ -134,5 +135,22 @@ class LocalStorageService {
   Future<void> clearPantryItems() async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.remove(_pantryItemsKey);
+  }
+
+  Future<List<String>> loadWineCategories() async {
+    final preferences = await SharedPreferences.getInstance();
+    return preferences.getStringList(_wineCategoriesKey) ?? [
+      'Red wine',
+      'White wine',
+      'Portuguese wine',
+      'Champagne',
+      'Specials',
+      'Beer',
+    ];
+  }
+
+  Future<void> saveWineCategories(List<String> categories) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setStringList(_wineCategoriesKey, categories);
   }
 }

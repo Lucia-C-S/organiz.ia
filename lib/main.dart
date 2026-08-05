@@ -38,11 +38,11 @@ class PantryApp extends StatelessWidget {
               useMaterial3: true,
 
               colorScheme: ColorScheme.light(
-                primary: const Color.fromARGB(224, 116, 98, 78),
-                secondary: const Color.fromARGB(111, 48, 113, 64),
+                primary: const Color.fromARGB(209, 107, 90, 71),
+                secondary: const Color.fromARGB(110, 23, 72, 35),
                 surface: const Color.fromARGB(112, 245, 242, 236),
                 ),
-              scaffoldBackgroundColor: Color.fromARGB(203, 96, 79, 59),
+              scaffoldBackgroundColor: Color.fromARGB(210, 107, 90, 71),
               cardTheme: CardThemeData(
                 elevation: 2,
                 margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
