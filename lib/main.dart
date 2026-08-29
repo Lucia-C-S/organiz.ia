@@ -2,7 +2,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'firebase_options.dart';
 import 'providers/pantry_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/pantry_map_screen.dart';
@@ -12,16 +11,19 @@ import 'screens/settings_screen.dart';
 
 Future<void> main() async {
 WidgetsFlutterBinding.ensureInitialized();
+
 try {
-   if (DefaultFirebaseOptions.isConfigured) {
-     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+   // On Android/iOS, Firebase will use the config from google-services.json / GoogleService-Info.plist.
+   // The app also supports a fallback to generated FirebaseOptions if they are later added by FlutterFire.
+   if (Firebase.apps.isEmpty) {
+     await Firebase.initializeApp();
    }
 } catch (error) {
-   debugPrint('Firebase initialization skipped: $error');
-}
-runApp(const PantryApp());
+   debugPrint('Firebase initialization failed: $error');
 }
 
+runApp(const PantryApp());
+}
 
 class PantryApp extends StatelessWidget {
   const PantryApp({super.key});
@@ -43,6 +45,43 @@ class PantryApp extends StatelessWidget {
                 surface: const Color.fromARGB(112, 245, 242, 236),
                 ),
               scaffoldBackgroundColor: Color.fromARGB(210, 107, 90, 71),
+              
+                    textTheme: const TextTheme(
+
+    // Large page titles
+    headlineLarge: TextStyle(
+      fontFamily: 'titulo',
+      fontSize: 34,
+      fontWeight: FontWeight.bold,
+      color: Colors.white,
+    ),
+
+    // Section titles
+    titleMedium: TextStyle(
+      fontFamily: 'subtitulo',
+      fontSize: 24,
+      color: Colors.white,
+    ),
+
+    // Regular body text
+    bodyLarge: TextStyle(
+      fontFamily: 'letra',
+      fontSize: 18,
+      color: Colors.white,
+    ),
+
+    bodyMedium: TextStyle(
+      fontFamily: 'letra',
+      fontSize: 16,
+      color: Colors.white,
+    ),
+
+    labelLarge: TextStyle(
+      fontFamily: 'subtitulo',
+      fontSize: 16,
+    ),
+  ),
+              
               cardTheme: CardThemeData(
                 elevation: 2,
                 margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
