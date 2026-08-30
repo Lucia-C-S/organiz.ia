@@ -10,29 +10,45 @@ class AuthProvider extends ChangeNotifier {
   User? _currentFirebaseUser;
   UserModel? _currentUser;
   bool _isLoading = false;
+  bool _isInitializing = true;
   String? _errorMessage;
 
   // Getters
   User? get currentFirebaseUser => _currentFirebaseUser;
   UserModel? get currentUser => _currentUser;
+  String get currentUserDisplayName => _currentUser?.displayName ?? 'User';
+  String get currentUserEmail => _currentUser?.email ?? '';
+  String get currentUserId => _currentFirebaseUser?.uid ?? '';
   bool get isSignedIn => _currentFirebaseUser != null;
   bool get isLoading => _isLoading;
+  bool get isInitializing => _isInitializing;
   String? get errorMessage => _errorMessage;
 
   AuthProvider() {
     _initializeAuth();
   }
 
-  /// Initialize authentication state listener
+  /// Initialize authentication state listener and check for persistent login
   void _initializeAuth() {
+    // Check if there's already a logged-in user (persistent login)
+    _currentFirebaseUser = _authService.currentUser;
+    if (_currentFirebaseUser != null) {
+      _loadUserModel(_currentFirebaseUser!.uid);
+    } else {
+      _isInitializing = false;
+      notifyListeners();
+    }
+
+    // Listen for auth state changes (for logout and new logins)
     _authService.authStateChanges.listen((firebaseUser) {
       _currentFirebaseUser = firebaseUser;
       if (firebaseUser != null) {
         _loadUserModel(firebaseUser.uid);
       } else {
         _currentUser = null;
+        _isInitializing = false;
+        notifyListeners();
       }
-      notifyListeners();
     });
   }
 
@@ -40,9 +56,11 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _loadUserModel(String uid) async {
     try {
       _currentUser = await _authService.getUserModel(uid);
+      _isInitializing = false;
       notifyListeners();
     } catch (e) {
       _errorMessage = 'Failed to load user data: $e';
+      _isInitializing = false;
       notifyListeners();
     }
   }

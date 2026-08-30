@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 import '../models/pantry_item.dart';
 import '../providers/pantry_provider.dart';
+import '../providers/auth_provider.dart';
+import '../providers/storage_provider.dart';
 
 class AddEditItemScreen extends StatefulWidget {
   const AddEditItemScreen({
@@ -37,6 +41,8 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
   int _pantryShelf = 1;
   int _pantryColumn = 1;
   String _wineCategory = '';
+  String _photoUrl = '';
+  bool _isUploadingPhoto = false;
 
   @override
   void initState() {
@@ -48,6 +54,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       _barcodeController.text = initial.barcode;
       _storeController.text = initial.store;
       _expiryDate = initial.expiryDate;
+      _photoUrl = initial.photoUrl;
       _gridRow = initial.gridRow;
       _gridColumn = initial.gridColumn;
       // If the saved location already specifies a cupboard, use it; otherwise normalize
@@ -133,7 +140,48 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     return '$_pantryZone • Shelf $_pantryShelf • Column $_pantryColumn';
   }
 
-  Future<void> _pickExpiryDate() async {
+  Future<void> _pickAndUploadPhoto() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.camera);
+
+    if (pickedFile == null) return;
+
+    if (!mounted) return;
+
+    setState(() {
+      _isUploadingPhoto = true;
+    });
+
+    final storageProvider = context.read<StorageProvider>();
+    final authProvider = context.read<AuthProvider>();
+
+    // Create a unique product ID (use current timestamp + user id)
+    final productId = '${authProvider.currentUserId}-${DateTime.now().millisecondsSinceEpoch}';
+
+    final downloadUrl = await storageProvider.uploadProductPhoto(
+      fileOrBytes: File(pickedFile.path),
+      productId: productId,
+      photoIndex: 0,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _isUploadingPhoto = false;
+      if (downloadUrl != null) {
+        _photoUrl = downloadUrl;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Photo uploaded successfully')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to upload photo: ${storageProvider.errorMessage}')),
+        );
+      }
+    });
+  }
+
+  void _pickExpiryDate() async {
     final now = DateTime.now();
     final selected = await showDatePicker(
       context: context,
@@ -153,7 +201,8 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       return;
     }
 
-    final provider = context.read<PantryProvider>();
+    final pantryProvider = context.read<PantryProvider>();
+    final authProvider = context.read<AuthProvider>();
 
     // Determine saved location name: for pantry, save cupboard name; for fridge/freezer use that name
     final savedLocation = _isPantry ? _pantryZone : _locationType;
@@ -163,7 +212,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       id: widget.initialItem?.id ?? '',
       name: _nameController.text.trim(),
       brand: _brandController.text.trim(),
-      photoUrl: '',
+      photoUrl: _photoUrl,
       expiryDate: _expiryDate!,
       store: _storeController.text.trim(),
       location: savedLocation,
@@ -172,14 +221,14 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       gridRow: _gridRow,
       gridColumn: _gridColumn,
       barcode: _isFreezer ? '' : _barcodeController.text.trim(),
-      addedBy: provider.currentUser,
+      addedBy: authProvider.currentUserDisplayName,
       addedAt: widget.initialItem?.addedAt ?? DateTime.now(),
     );
 
     if (widget.initialItem == null || widget.initialItem!.id.isEmpty) {
-      provider.addItem(item);
+      pantryProvider.addItem(item);
     } else {
-      provider.updateItem(item);
+      pantryProvider.updateItem(item);
     }
 
     Navigator.pop(context);
@@ -214,6 +263,41 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
             key: _formKey,
             child: Column(
               children: [
+                // Photo section at the top
+                GestureDetector(
+                  onTap: _isUploadingPhoto ? null : _pickAndUploadPhoto,
+                  child: Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey, width: 2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: _isUploadingPhoto
+                        ? const Center(
+                            child: CircularProgressIndicator(),
+                          )
+                        : (_photoUrl.isNotEmpty
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.network(
+                                  _photoUrl,
+                                  fit: BoxFit.cover,
+                                ),
+                              )
+                            : Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: const [
+                                    Icon(Icons.camera_alt, size: 48, color: Colors.grey),
+                                    SizedBox(height: 8),
+                                    Text('Tap to add photo', style: TextStyle(color: Colors.grey)),
+                                  ],
+                                ),
+                              )),
+                  ),
+                ),
+                const SizedBox(height: 20),
                 DropdownButtonFormField<String>(
                   value: _locationType,
                   decoration: const InputDecoration(

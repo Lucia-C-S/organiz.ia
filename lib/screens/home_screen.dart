@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../models/pantry_item.dart';
 import '../providers/pantry_provider.dart';
+import '../providers/auth_provider.dart';
 import '../widgets/pantry_item_card.dart';
 import 'add_edit_item_screen.dart';
 
@@ -11,22 +12,22 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<PantryProvider>(
-      builder: (context, provider, child) {
-        if (provider.isLoading) {
+    return Consumer2<PantryProvider, AuthProvider>(
+      builder: (context, pantryProvider, authProvider, child) {
+        if (pantryProvider.isLoading) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final groups = provider.groupedItems();
-        final groupType = provider.groupType;
+        final groups = pantryProvider.groupedItems();
+        final groupType = pantryProvider.groupType;
         return Scaffold(
           appBar: AppBar(
-            title: Text(provider.profileName.isNotEmpty ? provider.profileName : 'Family Pantry', 
+            title: Text(pantryProvider.profileName.isNotEmpty ? pantryProvider.profileName : 'Family Pantry', 
             style: Theme.of(context).textTheme.headlineLarge,),
             actions: [
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Center(child: Text('User: ${provider.currentUser}')),
+                child: Center(child: Text('User: ${authProvider.currentUserDisplayName}')),
               ),
             ],
           ),
@@ -35,7 +36,7 @@ class HomeScreen extends StatelessWidget {
             child: groups.isEmpty
                 ? Column(
                     children: [
-                      _HomeSummary(provider: provider),
+                      _HomeSummary(provider: pantryProvider),
                       const SizedBox(height: 12),
                       _GroupTypeSelector(groupType: groupType),
                       const SizedBox(height: 12),
@@ -52,7 +53,7 @@ class HomeScreen extends StatelessWidget {
                 : SingleChildScrollView(
                     child: Column(
                       children: [
-                        _HomeSummary(provider: provider),
+                        _HomeSummary(provider: pantryProvider),
                         const SizedBox(height: 12),
                         _GroupTypeSelector(groupType: groupType),
                         const SizedBox(height: 12),

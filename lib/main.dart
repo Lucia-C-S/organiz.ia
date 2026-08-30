@@ -100,7 +100,11 @@ class PantryApp extends StatelessWidget {
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               ),
             ),
-            home: authProvider.isSignedIn ? const PantryHomePage() : const AuthScreen(),
+            home: authProvider.isInitializing
+                ? const Scaffold(
+                    body: Center(child: CircularProgressIndicator()),
+                  )
+                : (authProvider.isSignedIn ? const PantryHomePage() : const AuthScreen()),
           );
         },
       ),
