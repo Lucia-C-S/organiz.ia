@@ -36,7 +36,7 @@ class PantryProvider extends ChangeNotifier {
   Map<String, Map<String, int>> _locationMeta = {};
   bool _autoOpenAddAfterLookup = true;
   bool _autoAddWhenProductFound = false;
-  String _profileName = 'My Pantry';
+  String _profileName = 'Despensa';
   int _defaultExpiryDays = 14;
   int _preferredColorSeedIndex = 0;
   List<String> _wineCategories = [];
@@ -79,7 +79,7 @@ class PantryProvider extends ChangeNotifier {
   int get preferredColorSeedIndex => _preferredColorSeedIndex;
 
   void setProfileName(String name) {
-    _profileName = name.trim().isEmpty ? 'My Pantry' : name.trim();
+    _profileName = name.trim().isEmpty ? 'Despensa' : name.trim();
     _storageService.saveProfileName(_profileName);
     notifyListeners();
   }
@@ -143,7 +143,7 @@ class PantryProvider extends ChangeNotifier {
     } catch (_) {
       _autoOpenAddAfterLookup = false;
       _autoAddWhenProductFound = false;
-      _profileName = 'My Pantry';
+      _profileName = 'Despensa';
       _defaultExpiryDays = 14;
       _preferredColorSeedIndex = 0;
       _wineCategories = [

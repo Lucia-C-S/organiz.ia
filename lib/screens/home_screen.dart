@@ -21,7 +21,8 @@ class HomeScreen extends StatelessWidget {
         final groupType = provider.groupType;
         return Scaffold(
           appBar: AppBar(
-            title: Text(provider.profileName.isNotEmpty ? provider.profileName : 'Family Pantry'),
+            title: Text(provider.profileName.isNotEmpty ? provider.profileName : 'Family Pantry', 
+            style: Theme.of(context).textTheme.headlineLarge,),
             actions: [
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),

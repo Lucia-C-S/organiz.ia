@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'providers/pantry_provider.dart';
+import 'providers/auth_provider.dart';
+import 'providers/storage_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/pantry_map_screen.dart';
 import 'screens/calendar_screen.dart';
@@ -30,12 +32,16 @@ class PantryApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => PantryProvider()..loadItems(),
-      child: Consumer<PantryProvider>(
-        builder: (context, provider, child) {
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => StorageProvider()),
+        ChangeNotifierProvider(create: (_) => PantryProvider()..loadItems()),
+      ],
+      child: Consumer<AuthProvider>(
+        builder: (context, authProvider, child) {
           return MaterialApp(
-            title: provider.profileName.isNotEmpty ? provider.profileName : 'Organiz.IA Pantry',
+            title: 'Organiz.IA Pantry',
             theme: ThemeData(
               useMaterial3: true,
 
@@ -94,7 +100,150 @@ class PantryApp extends StatelessWidget {
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               ),
             ),
-            home: const PantryHomePage(),
+            home: authProvider.isSignedIn ? const PantryHomePage() : const AuthScreen(),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class AuthScreen extends StatefulWidget {
+  const AuthScreen({super.key});
+
+  @override
+  State<AuthScreen> createState() => _AuthScreenState();
+}
+
+class _AuthScreenState extends State<AuthScreen> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _displayNameController = TextEditingController();
+  bool _isSignUp = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _displayNameController.dispose();
+    super.dispose();
+  }
+
+  void _submit(AuthProvider authProvider) async {
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all fields')),
+      );
+      return;
+    }
+
+    if (_isSignUp && _displayNameController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a display name')),
+      );
+      return;
+    }
+
+    bool success;
+    if (_isSignUp) {
+      success = await authProvider.signUp(
+        email: _emailController.text,
+        password: _passwordController.text,
+        displayName: _displayNameController.text,
+      );
+    } else {
+      success = await authProvider.signIn(
+        email: _emailController.text,
+        password: _passwordController.text,
+      );
+    }
+
+    if (!mounted) return;
+
+    if (!success && authProvider.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(authProvider.errorMessage!)),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_isSignUp ? 'Sign Up' : 'Sign In'),
+      ),
+      body: Consumer<AuthProvider>(
+        builder: (context, authProvider, child) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(height: 40),
+                Text(
+                  'Organiz.IA',
+                  style: Theme.of(context).textTheme.headlineLarge,
+                ),
+                const SizedBox(height: 40),
+                if (_isSignUp)
+                  TextField(
+                    controller: _displayNameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Display Name',
+                      hintText: 'Enter your name',
+                    ),
+                  ),
+                if (_isSignUp) const SizedBox(height: 16),
+                TextField(
+                  controller: _emailController,
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    hintText: 'Enter your email',
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _passwordController,
+                  decoration: const InputDecoration(
+                    labelText: 'Password',
+                    hintText: 'Enter your password',
+                  ),
+                  obscureText: true,
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton(
+                  onPressed: authProvider.isLoading
+                      ? null
+                      : () => _submit(authProvider),
+                  child: authProvider.isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(_isSignUp ? 'Sign Up' : 'Sign In'),
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _isSignUp = !_isSignUp;
+                      _emailController.clear();
+                      _passwordController.clear();
+                      _displayNameController.clear();
+                      authProvider.clearError();
+                    });
+                  },
+                  child: Text(
+                    _isSignUp
+                        ? 'Already have an account? Sign In'
+                        : 'Don\'t have an account? Sign Up',
+                  ),
+                ),
+              ],
+            ),
           );
         },
       ),
