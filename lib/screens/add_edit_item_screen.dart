@@ -7,7 +7,7 @@ import 'dart:io';
 import '../models/pantry_item.dart';
 import '../providers/pantry_provider.dart';
 import '../providers/auth_provider.dart';
-import '../providers/storage_provider.dart';
+import '../services/cloudinary_service.dart';
 
 class AddEditItemScreen extends StatefulWidget {
   const AddEditItemScreen({
@@ -142,7 +142,37 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
 
   Future<void> _pickAndUploadPhoto() async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.camera);
+
+    // Show camera/gallery choice
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (_) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Take photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose from gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    final pickedFile = await picker.pickImage(
+      source: source,
+      imageQuality: 75,
+      maxWidth: 800,
+    );
 
     if (pickedFile == null) return;
 
@@ -152,33 +182,38 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
       _isUploadingPhoto = true;
     });
 
-    final storageProvider = context.read<StorageProvider>();
-    final authProvider = context.read<AuthProvider>();
+    try {
+      final downloadUrl = await CloudinaryService.uploadImage(File(pickedFile.path));
 
-    // Create a unique product ID (use current timestamp + user id)
-    final productId = '${authProvider.currentUserId}-${DateTime.now().millisecondsSinceEpoch}';
+      if (!mounted) return;
 
-    final downloadUrl = await storageProvider.uploadProductPhoto(
-      fileOrBytes: File(pickedFile.path),
-      productId: productId,
-      photoIndex: 0,
-    );
+      setState(() {
+        _isUploadingPhoto = false;
+      });
 
-    if (!mounted) return;
-
-    setState(() {
-      _isUploadingPhoto = false;
       if (downloadUrl != null) {
-        _photoUrl = downloadUrl;
+        setState(() {
+          _photoUrl = downloadUrl;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Photo uploaded successfully')),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to upload photo: ${storageProvider.errorMessage}')),
+          const SnackBar(content: Text('Failed to upload photo')),
         );
       }
-    });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isUploadingPhoto = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Upload error: $e')),
+      );
+    }
   }
 
   void _pickExpiryDate() async {
